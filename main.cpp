@@ -1,5 +1,7 @@
-#include "Widget.h"
 #include <QApplication>
+
+#include "Widget.h"
+#include "Md5SyncWidget.h"
 
 int main(int argc, char *argv[])
 {
@@ -8,7 +10,8 @@ int main(int argc, char *argv[])
    a.setOrganizationName("g-bits");
    a.setApplicationName("Md5Sync");
 
-   Widget w;
+   //Widget w;
+   Md5SyncWidget w;
    w.show();
 
    return a.exec();

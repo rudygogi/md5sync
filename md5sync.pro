@@ -27,10 +27,15 @@ DEFINES += QT_DEPRECATED_WARNINGS
 
 SOURCES += \
         main.cpp \
-        Widget.cpp
+        Widget.cpp \
+    Md5SyncWidget.cpp \
+    FileSystemMd5Model.cpp
 
 HEADERS += \
-        Widget.h
+        Widget.h \
+    Md5SyncWidget.h \
+    FileSystemMd5Model.h
 
 FORMS += \
-        Widget.ui
+        Widget.ui \
+    Md5SyncWidget.ui
