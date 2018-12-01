@@ -34,13 +34,13 @@ Md5SyncWidget::Md5SyncWidget(QWidget *parent) :
 
     FileSystemMd5Model* fileModel = new FileSystemMd5Model(this);
     fileModel->setRootPath("");
+    fileModel->setFilter(QDir::AllEntries | QDir::NoDot);
     ui->leftTableView->setModel(fileModel);
     ui->rightTableView->setModel(fileModel);
     updatePath(ui->leftPathLineEdit, ui->leftTableView);
     updatePath(ui->rightPathLineEdit, ui->rightTableView);
 
-    ui->leftTableView->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
-    ui->rightTableView->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
+    ui->leftTableView->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
 }
 
 Md5SyncWidget::~Md5SyncWidget()
