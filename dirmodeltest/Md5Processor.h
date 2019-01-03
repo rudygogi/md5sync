@@ -11,7 +11,7 @@ public:
 public slots:
     void computeMd5(
             const QStringList& fileInfoList,
-            int accuracyPercent = 100);
+            int accuracyPercent = 10);
 
 signals:
     void md5Computed(

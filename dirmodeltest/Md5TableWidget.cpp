@@ -3,6 +3,8 @@
 
 #include <QCompleter>
 #include <QDesktopServices>
+#include <QScrollBar>
+#include <QStandardPaths>
 #include <QThread>
 #include <QTimer>
 #include <QUrl>
@@ -20,8 +22,15 @@ Md5TableWidget::Md5TableWidget(QWidget *parent) :
                 m_ui->tableView->fontMetrics().height());
 
     m_model = new Md5Model(this);
-    m_model->setRootPath("/");
+    auto pictLocationList = QStandardPaths::standardLocations(QStandardPaths::PicturesLocation);
+    if (!pictLocationList.isEmpty())
+    {
+        m_ui->pathLineEdit->setText(pictLocationList.first());
+    }
+    m_model->setRootPath("");
     m_ui->tableView->setModel(m_model);
+    m_ui->tableView->setRootIndex(
+                m_model->index(m_ui->pathLineEdit->text()));
 
     connect(m_ui->tableView, &QAbstractItemView::doubleClicked,
             this, &Md5TableWidget::onDoubleClicked);
@@ -42,13 +51,20 @@ Md5TableWidget::Md5TableWidget(QWidget *parent) :
             this, [=](){ resizeSections(); });
     connect(m_ui->cdUpButton, &QToolButton::clicked,
             this, &Md5TableWidget::cdUp);
-    updatePathLine();
     QCompleter* completer = new QCompleter(m_model, m_ui->pathLineEdit);
     completer->setCaseSensitivity(Qt::CaseInsensitive);
     m_ui->pathLineEdit->setCompleter(completer);
 
     connect(m_ui->pathLineEdit, &QLineEdit::returnPressed,
             this, &Md5TableWidget::cd);
+
+    connect(m_ui->tableView->verticalScrollBar(), &QScrollBar::valueChanged,
+            this, &Md5TableWidget::dataChanged);
+    connect(m_ui->tableView->selectionModel(), &QItemSelectionModel::selectionChanged,
+            this, &Md5TableWidget::dataChanged);
+    connect(m_ui->tableView->horizontalHeader(), &QHeaderView::sortIndicatorChanged,
+            this, &Md5TableWidget::dataChanged);
+    setScrollBarPosition(POSITION_RIGHT);
 }
 
 Md5TableWidget::~Md5TableWidget()
@@ -58,6 +74,74 @@ Md5TableWidget::~Md5TableWidget()
     m_md5Thread->wait(3000);
     delete m_md5Thread;
     delete m_ui;
+}
+
+void Md5TableWidget::setScrollBarPosition(Md5TableWidget::ScrollBarPosition pos)
+{
+    switch(pos)
+    {
+    case POSITION_LEFT:
+        m_scrollBar = m_ui->leftVerticalScrollBar;
+        break;
+    case POSITION_RIGHT:
+        m_scrollBar = m_ui->rightVerticalScrollBar;
+        break;
+    }
+    m_ui->leftVerticalScrollBar->setVisible(
+                m_ui->leftVerticalScrollBar == m_scrollBar);
+    m_ui->rightVerticalScrollBar->setVisible(
+                m_ui->rightVerticalScrollBar == m_scrollBar);
+
+    m_scrollBar->setRange(
+                m_ui->tableView->verticalScrollBar()->minimum(),
+                m_ui->tableView->verticalScrollBar()->maximum());
+    m_scrollBar->setValue(m_ui->tableView->verticalScrollBar()->value());
+    connect(m_ui->tableView->verticalScrollBar(), &QAbstractSlider::rangeChanged,
+            m_scrollBar, &QAbstractSlider::setRange,
+            Qt::UniqueConnection);
+    connect(m_scrollBar, &QAbstractSlider::valueChanged,
+            m_ui->tableView->verticalScrollBar(), &QAbstractSlider::setValue,
+            Qt::UniqueConnection);
+}
+
+int Md5TableWidget::getTableTopPos() const
+{
+    const int tableTopPos = m_ui->tableView->geometry().top() +
+            m_ui->tableView->horizontalHeader()->height();
+    return tableTopPos;
+}
+
+QHash<QByteArray, QSet<int>> Md5TableWidget::getMd5PositionHash() const
+{
+    QHash<QByteArray, QSet<int>> md5PositionHash;
+
+    QModelIndex rootIndex = m_ui->tableView->rootIndex();
+    for(int row = 0; row < m_model->rowCount(rootIndex); ++row)
+    {
+        QModelIndex rowIndex = m_model->index(row, 0, rootIndex);
+        QByteArray md5 = m_model->getMd5(rowIndex);
+        if (md5.isEmpty())
+        {
+            continue;
+        }
+        QRect rowRect = m_ui->tableView->visualRect(rowIndex);
+        int rowPosY = rowRect.top() + rowRect.height() / 2;
+        md5PositionHash[md5].insert(rowPosY);
+    }
+
+    return md5PositionHash;
+}
+
+QSet<QByteArray> Md5TableWidget::getSelectedMd5Set() const
+{
+    QSet<QByteArray> selectedSet;
+    auto indexList = m_ui->tableView->selectionModel()->selectedRows();
+    for(auto index : indexList)
+    {
+        QByteArray md5 = m_model->getMd5(index);
+        selectedSet.insert(md5);
+    }
+    return selectedSet;
 }
 
 void Md5TableWidget::onDoubleClicked(const QModelIndex &index)
@@ -80,6 +164,8 @@ void Md5TableWidget::setMd5(const QString &fileInfo, const QByteArray &md5)
 {
     QModelIndex index = m_model->index(fileInfo);
     m_model->setMd5(index, md5);
+
+    emit dataChanged();
 }
 
 void Md5TableWidget::requestMd5()
@@ -94,6 +180,8 @@ void Md5TableWidget::cdUp()
     requestMd5();
     updatePathLine();
     resizeSections();
+
+    emit dataChanged();
 }
 
 void Md5TableWidget::cd()
@@ -107,6 +195,8 @@ void Md5TableWidget::cd()
     m_ui->tableView->setRootIndex(index);
     requestMd5();
     m_ui->tableView->horizontalHeader()->resizeSections(QHeaderView::ResizeToContents);
+
+    emit dataChanged();
 }
 
 void Md5TableWidget::updatePathLine()

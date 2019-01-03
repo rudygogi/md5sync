@@ -12,7 +12,10 @@ public:
     QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
     QStringList getMissingMd5FileInfoList(const QModelIndex& parent) const;
     void setMd5(const QModelIndex& index, const QByteArray& md5);
+    QByteArray getMd5(const QModelIndex& index) const;
+
 private:
     QHash<QPersistentModelIndex, QByteArray> m_md5Hash;
+    const int m_md5Column;
 };
 
