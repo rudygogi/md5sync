@@ -65,6 +65,10 @@ Md5TableWidget::Md5TableWidget(QWidget *parent) :
     connect(m_ui->tableView->horizontalHeader(), &QHeaderView::sortIndicatorChanged,
             this, &Md5TableWidget::dataChanged);
     setScrollBarPosition(POSITION_RIGHT);
+    m_ui->tableView->verticalHeader()->setSortIndicator(0, Qt::AscendingOrder);
+    m_ui->tableView->sortByColumn(
+                m_ui->tableView->verticalHeader()->sortIndicatorSection(),
+                m_ui->tableView->verticalHeader()->sortIndicatorOrder());
 }
 
 Md5TableWidget::~Md5TableWidget()
