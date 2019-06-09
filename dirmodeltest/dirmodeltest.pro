@@ -18,14 +18,17 @@ SOURCES += main.cpp\
     Md5Model.cpp \
     Md5Processor.cpp \
     Md5TableWidget.cpp \
-    MainWindow.cpp
+    MainWindow.cpp \
+    PreferencesDialog.cpp
 
 HEADERS  += \
     Md5Model.h \
     Md5Processor.h \
     Md5TableWidget.h \
-    MainWindow.h
+    MainWindow.h \
+    PreferencesDialog.h
 
 FORMS    += \
     Md5TableWidget.ui \
-    MainWindow.ui
+    MainWindow.ui \
+    PreferencesDialog.ui

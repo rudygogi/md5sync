@@ -11,28 +11,34 @@ Md5Processor::Md5Processor()
 
 }
 
-void Md5Processor::computeMd5(const QStringList &fileInfoList, int accuracyPercent)
+void Md5Processor::setPreferences(int chunkSize, int chunkStep)
+{
+    m_chunkSize = chunkSize;
+    m_chunkStep = chunkStep;
+    QTimer::singleShot(0, this, [this](){ computeMd5();});
+}
+
+void Md5Processor::computeMd5(const QStringList &fileInfoList)
 {
     m_shouldBreak = true;
     m_fileInfoList = fileInfoList;
-    m_accuracyPercent = accuracyPercent;
     QTimer::singleShot(0, this, [this](){ computeMd5();});
 }
 
 void Md5Processor::computeMd5()
 {
     m_shouldBreak = false;
-    int readByteCount = 100;
-    if (m_accuracyPercent < 1)
-    {
-        readByteCount = 1;
-    }
-    else if (m_accuracyPercent < 100)
-    {
-        readByteCount = m_accuracyPercent;
-    }
-    int skipByteCount = (100 - readByteCount) * 100;
-    readByteCount = readByteCount * 100;
+//    int readByteCount = 100;
+//    if (m_accuracyPercent < 1)
+//    {
+//        readByteCount = 1;
+//    }
+//    else if (m_accuracyPercent < 100)
+//    {
+//        readByteCount = m_accuracyPercent;
+//    }
+//    int skipByteCount = (100 - readByteCount) * 100;
+//    readByteCount = readByteCount * 100;
 
     for(QString fileInfo : m_fileInfoList)
     {
@@ -44,16 +50,26 @@ void Md5Processor::computeMd5()
             continue;
         }
         QCryptographicHash md5Hash(QCryptographicHash::Md5);
-        while(!file.atEnd())
+        if (m_chunkSize == 0)
         {
-            int pos = file.pos();
-            md5Hash.addData(file.read(readByteCount));
-            file.seek(pos + readByteCount + skipByteCount);
-            QCoreApplication::processEvents();
-            if (m_shouldBreak)
+            md5Hash.addData(file.readAll());
+        }
+        else
+        {
+            while(!file.atEnd())
             {
-                qWarning() << "break";
-                return;
+                int pos = file.pos();
+                md5Hash.addData(file.read(m_chunkSize));
+                if (m_chunkStep == 0)
+                {
+                    break;
+                }
+                file.seek(pos + m_chunkStep);
+                if (m_shouldBreak)
+                {
+                    qWarning() << "break";
+                    return;
+                }
             }
         }
         emit md5Computed(fileInfo, md5Hash.result());

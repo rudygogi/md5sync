@@ -16,10 +16,12 @@ public:
     ~MainWindow() override;
 
 protected:
-    void showEvent(QShowEvent *se) override;
+    void resizeEvent(QResizeEvent *re) override;
 
 private:
     void updateConnections();
+    void showPreferences();
+    void updatePreferences();
 
 private:
     Ui::MainWindow *ui;

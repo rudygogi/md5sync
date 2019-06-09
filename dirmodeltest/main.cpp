@@ -4,6 +4,8 @@
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
+    a.setOrganizationName("gsol");
+    a.setApplicationName("duplicatefinder");
     MainWindow w;
     w.showMaximized();
 

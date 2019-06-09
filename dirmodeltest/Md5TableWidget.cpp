@@ -3,6 +3,7 @@
 
 #include <QCompleter>
 #include <QDesktopServices>
+#include <QImageReader>
 #include <QScrollBar>
 #include <QStandardPaths>
 #include <QThread>
@@ -11,6 +12,9 @@
 
 #include "Md5Model.h"
 #include "Md5Processor.h"
+
+#include <QDesktopServices>
+#include <QUrl>
 
 Md5TableWidget::Md5TableWidget(QWidget *parent) :
     QWidget(parent),
@@ -69,6 +73,58 @@ Md5TableWidget::Md5TableWidget(QWidget *parent) :
     m_ui->tableView->sortByColumn(
                 m_ui->tableView->verticalHeader()->sortIndicatorSection(),
                 m_ui->tableView->verticalHeader()->sortIndicatorOrder());
+
+    connect(m_ui->tableView->selectionModel(), &QItemSelectionModel::selectionChanged,
+            this, [=](const QItemSelection&, const QItemSelection& ) {
+       showSelectedPreviews();
+    });
+
+    connect(m_ui->listWidget, &QListWidget::itemDoubleClicked, this, [](QListWidgetItem* item) {
+       if (!item)
+       {
+           return;
+       }
+       QString absFileName = item->data(Qt::UserRole).toString();
+       if (absFileName.isEmpty())
+       {
+           return;
+       }
+       QUrl url = QUrl::fromLocalFile(absFileName);
+       QDesktopServices::openUrl(url);
+    });
+
+    connect(m_model, &QFileSystemModel::directoryLoaded, this, [this](const QString&) {
+       onDirectoryLoaded();
+    }, Qt::QueuedConnection);
+    connect(m_model, &QFileSystemModel::rootPathChanged, this, [this](const QString&) {
+       onDirectoryLoaded();
+    }, Qt::QueuedConnection);
+    connect(m_model, &QAbstractItemModel::layoutChanged, this, [this]() {
+       onDirectoryLoaded();
+    }, Qt::QueuedConnection);
+
+    connect(m_ui->allButton, &QPushButton::clicked, this, [this]() {
+        selectAll();
+    });
+    connect(m_ui->duplicatesButton, &QPushButton::clicked, this, [this]() {
+        selectDuplicates();
+    });
+    connect(m_ui->presentButton, &QPushButton::clicked, this, [this]() {
+        selectPresent();
+    });
+    connect(m_ui->missingButton, &QPushButton::clicked, this, [this]() {
+        selectMissing();
+    });
+
+    connect(m_ui->noneButton, &QPushButton::clicked,
+            this, [this]() { selectNone(); });
+
+    connect(m_ui->cleanButton, &QPushButton::clicked,
+            this, [this]() { cleanFiles(); });
+    connect(m_ui->copyButton, &QPushButton::clicked,
+            this, [this]() { copyFiles(); });
+    connect(m_ui->moveButton, &QPushButton::clicked,
+            this, [this]() { moveFiles(); });
 }
 
 Md5TableWidget::~Md5TableWidget()
@@ -115,6 +171,18 @@ int Md5TableWidget::getTableTopPos() const
     return tableTopPos;
 }
 
+int Md5TableWidget::getTableHeight() const
+{
+    const int tableHeight = m_ui->tableView->geometry().height() -
+            m_ui->tableView->horizontalHeader()->height();
+    return tableHeight;
+}
+
+void Md5TableWidget::setPreferences(int chunkSize, int chunkStep)
+{
+    m_md5Worker->setPreferences(chunkSize, chunkStep);
+}
+
 QHash<QByteArray, QSet<int>> Md5TableWidget::getMd5PositionHash() const
 {
     QHash<QByteArray, QSet<int>> md5PositionHash;
@@ -148,15 +216,43 @@ QSet<QByteArray> Md5TableWidget::getSelectedMd5Set() const
     return selectedSet;
 }
 
+QString Md5TableWidget::getDirPath() const
+{
+    auto rootIndex = m_ui->tableView->rootIndex();
+    auto pathInfo = m_model->fileInfo(rootIndex);
+    return pathInfo.absoluteFilePath();
+}
+
+void Md5TableWidget::setOtherTableData(const QString& dirPath, const QSet<QByteArray>& md5Set)
+{
+    m_otherDirPath = dirPath;
+    m_otherMd5Set = md5Set;
+}
+
+QSet<QByteArray> Md5TableWidget::getMd5Set() const
+{
+    QSet<QByteArray> md5Set;
+    QModelIndex rootIndex = m_ui->tableView->rootIndex();
+    for(int row = 0; row < m_model->rowCount(rootIndex); ++row)
+    {
+        QModelIndex index = rootIndex.child(row, 0);
+        QByteArray md5 = m_model->getMd5(index);
+        if (md5.isEmpty())
+        {
+            continue;
+        }
+        md5Set.insert(md5);
+    }
+    return md5Set;
+}
+
 void Md5TableWidget::onDoubleClicked(const QModelIndex &index)
 {
     QFileInfo fileInfo = m_model->fileInfo(index);
     if (fileInfo.isDir())
     {
         m_ui->tableView->setRootIndex(m_model->index(fileInfo.absoluteFilePath()));
-        resizeSections();
-        updatePathLine();
-        requestMd5();
+        onDirectoryLoaded();
     }
     else
     {
@@ -180,12 +276,8 @@ void Md5TableWidget::requestMd5()
 
 void Md5TableWidget::cdUp()
 {
-    m_ui->tableView->setRootIndex(m_ui->tableView->rootIndex().parent());
-    requestMd5();
-    updatePathLine();
-    resizeSections();
-
-    emit dataChanged();
+    m_ui->tableView->setRootIndex(m_ui->tableView->rootIndex().parent());    
+    onDirectoryLoaded();
 }
 
 void Md5TableWidget::cd()
@@ -197,10 +289,7 @@ void Md5TableWidget::cd()
         return;
     }
     m_ui->tableView->setRootIndex(index);
-    requestMd5();
-    m_ui->tableView->horizontalHeader()->resizeSections(QHeaderView::ResizeToContents);
-
-    emit dataChanged();
+    onDirectoryLoaded();
 }
 
 void Md5TableWidget::updatePathLine()
@@ -208,7 +297,171 @@ void Md5TableWidget::updatePathLine()
     m_ui->pathLineEdit->setText(QDir::toNativeSeparators(m_model->filePath(m_ui->tableView->rootIndex())));
 }
 
+void Md5TableWidget::onDirectoryLoaded()
+{
+    QCoreApplication::processEvents(QEventLoop::AllEvents);
+    m_ui->tableView->horizontalHeader()->resizeSections(QHeaderView::ResizeToContents);
+    requestMd5();
+    updatePathLine();
+    resizeSections();
+
+    emit dataChanged();
+}
+
 void Md5TableWidget::resizeSections()
 {
     m_ui->tableView->horizontalHeader()->resizeSections(QHeaderView::ResizeToContents);
+}
+
+void Md5TableWidget::showSelectedPreviews()
+{
+    m_ui->listWidget->clear();
+    auto selectedRows = m_ui->tableView->selectionModel()->selectedRows();
+    for(auto selectedIndex : selectedRows)
+    {
+        auto fileInfo = m_model->fileInfo(selectedIndex);
+        if (fileInfo.isDir())
+        {
+            continue;
+        }
+
+        QIcon icon;
+        QImageReader imageReader(fileInfo.absoluteFilePath());
+        imageReader.setAutoTransform(true);
+        QImage image = imageReader.read();
+        if (!image.isNull())
+        {
+            QPixmap pixmap;
+            pixmap.convertFromImage(image);
+            icon = QIcon(pixmap.scaled(QSize(128, 128), Qt::KeepAspectRatio));
+        }
+        auto item = new QListWidgetItem(icon, fileInfo.fileName().left(8).append("..."));
+        item->setData(Qt::UserRole, fileInfo.absoluteFilePath());
+        m_ui->listWidget->addItem(item);
+    }
+}
+
+void Md5TableWidget::selectAll()
+{
+    m_ui->tableView->selectAll();
+}
+
+void Md5TableWidget::selectNone()
+{
+    m_ui->tableView->clearSelection();
+}
+
+void Md5TableWidget::selectDuplicates()
+{
+    selectNone();
+    QHash<QByteArray, QModelIndexList> md5IndexHash;
+    QModelIndex rootIndex = m_ui->tableView->rootIndex();
+    for(int row = 0; row < m_model->rowCount(rootIndex); ++row)
+    {
+        QModelIndex index = rootIndex.child(row, 0);
+        QByteArray md5 = m_model->getMd5(index);
+        if (md5.isEmpty())
+        {
+            continue;
+        }
+        md5IndexHash[md5].append(index);
+    }
+    for(auto md5 : md5IndexHash.keys())
+    {
+        const auto& indexList = md5IndexHash[md5];
+        if (indexList.size() == 1)
+        {
+            continue;
+        }
+        for(auto index : indexList)
+        {
+            m_ui->tableView->selectionModel()->select(index, QItemSelectionModel::Select | QItemSelectionModel::Rows);
+        }
+    }
+}
+
+void Md5TableWidget::selectPresent()
+{
+    selectNone();
+    QModelIndex rootIndex = m_ui->tableView->rootIndex();
+    for(int row = 0; row < m_model->rowCount(rootIndex); ++row)
+    {
+        QModelIndex index = rootIndex.child(row, 0);
+        QByteArray md5 = m_model->getMd5(index);
+        if (!md5.isEmpty() && m_otherMd5Set.contains(md5))
+        {
+            m_ui->tableView->selectionModel()->select(index, QItemSelectionModel::Select | QItemSelectionModel::Rows);
+        }
+    }
+}
+
+void Md5TableWidget::selectMissing()
+{
+    selectNone();
+    QModelIndex rootIndex = m_ui->tableView->rootIndex();
+    for(int row = 0; row < m_model->rowCount(rootIndex); ++row)
+    {
+        QModelIndex index = rootIndex.child(row, 0);
+        QByteArray md5 = m_model->getMd5(index);
+        if (!md5.isEmpty() && !m_otherMd5Set.contains(md5))
+        {
+            m_ui->tableView->selectionModel()->select(index, QItemSelectionModel::Select | QItemSelectionModel::Rows);
+        }
+    }
+}
+
+void Md5TableWidget::cleanFiles()
+{
+    auto rootIndex = m_ui->tableView->rootIndex();
+    auto pathInfo = m_model->fileInfo(rootIndex);
+    if (!pathInfo.isDir())
+    {
+        return;
+    }
+    QString cleanDirName = QFileInfo(pathInfo.absoluteFilePath(), "cleaned").absoluteFilePath();
+    if (!QDir(cleanDirName).exists())
+    {
+        QDir(pathInfo.absoluteFilePath()).mkdir("cleaned");
+    }
+    for(int row = 0; row < m_ui->listWidget->count(); ++row)
+    {
+        auto* item = m_ui->listWidget->item(row);
+        QString oldFilePath = item->data(Qt::UserRole).toString();
+        QString newFilePath = QFileInfo(cleanDirName, QFileInfo(oldFilePath).fileName()).absoluteFilePath();
+        QFile::rename(oldFilePath, newFilePath);
+    }
+}
+
+void Md5TableWidget::copyFiles()
+{
+    auto rootIndex = m_ui->tableView->rootIndex();
+    auto pathInfo = m_model->fileInfo(rootIndex);
+    if (!pathInfo.isDir())
+    {
+        return;
+    }
+    for(int row = 0; row < m_ui->listWidget->count(); ++row)
+    {
+        auto* item = m_ui->listWidget->item(row);
+        QString oldFilePath = item->data(Qt::UserRole).toString();
+        QString newFilePath = QFileInfo(m_otherDirPath, QFileInfo(oldFilePath).fileName()).absoluteFilePath();
+        QFile::copy(oldFilePath, newFilePath);
+    }
+}
+
+void Md5TableWidget::moveFiles()
+{
+    auto rootIndex = m_ui->tableView->rootIndex();
+    auto pathInfo = m_model->fileInfo(rootIndex);
+    if (!pathInfo.isDir())
+    {
+        return;
+    }
+    for(int row = 0; row < m_ui->listWidget->count(); ++row)
+    {
+        auto* item = m_ui->listWidget->item(row);
+        QString oldFilePath = item->data(Qt::UserRole).toString();
+        QString newFilePath = QFileInfo(m_otherDirPath, QFileInfo(oldFilePath).fileName()).absoluteFilePath();
+        QFile::rename(oldFilePath, newFilePath);
+    }
 }

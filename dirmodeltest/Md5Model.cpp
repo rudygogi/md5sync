@@ -42,7 +42,7 @@ QVariant Md5Model::data(const QModelIndex &index, int role) const
 
 QVariant Md5Model::headerData(int section, Qt::Orientation orientation, int role) const
 {
-    if (section < m_md5Column - 1 || orientation != Qt::Horizontal || role != Qt::DisplayRole)
+    if (section < m_md5Column || orientation != Qt::Horizontal || role != Qt::DisplayRole)
     {
         return QFileSystemModel::headerData(section, orientation, role);
     }

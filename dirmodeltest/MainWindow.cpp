@@ -1,7 +1,9 @@
 #include "MainWindow.h"
 #include "ui_MainWindow.h"
 
+#include "PreferencesDialog.h"
 #include <QTimer>
+#include <QSettings>
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -15,8 +17,13 @@ MainWindow::MainWindow(QWidget *parent) :
     graphPalette.setColor(QPalette::Base, graphPalette.color(QPalette::Window));
     ui->graphicsView->setPalette(graphPalette);
 
-    connect(ui->leftTable, &Md5TableWidget::dataChanged, this, [=]() { updateConnections();});
-    connect(ui->rightTable, &Md5TableWidget::dataChanged, this, [=]() { updateConnections();});
+    connect(ui->leftTable, &Md5TableWidget::dataChanged, this, [this]() { updateConnections();});
+    connect(ui->rightTable, &Md5TableWidget::dataChanged, this, [this]() { updateConnections();});
+
+    connect(ui->preferencesAction, &QAction::triggered, this, [this](bool){ showPreferences(); });
+    connect(ui->exitAction, &QAction::triggered, this, [](bool){ QCoreApplication::quit(); });
+
+    updatePreferences();
 }
 
 MainWindow::~MainWindow()
@@ -24,18 +31,19 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
-void MainWindow::showEvent(QShowEvent* se)
+void MainWindow::resizeEvent(QResizeEvent* re)
 {
-    QMainWindow::showEvent(se);
+    QMainWindow::resizeEvent(re);
 
-    ui->middleWidget->setFixedHeight(
-                qMin(ui->leftTable->getTableTopPos(), ui->rightTable->getTableTopPos()));
+    QTimer::singleShot(0, this, [this]() {
+        updateConnections();
+    });
 }
 
 void MainWindow::updateConnections()
 {
     QGraphicsScene* scene = new QGraphicsScene(ui->graphicsView);
-    scene->setSceneRect(QRect(QPoint(0,0), ui->graphicsView->size()));
+    scene->setSceneRect(QRect(QPoint(0,-ui->leftTable->getTableTopPos()), ui->graphicsView->size()));
 
     QHash<QByteArray, QSet<int>> leftPositionHash =
             ui->leftTable->getMd5PositionHash();
@@ -131,4 +139,35 @@ void MainWindow::updateConnections()
 
     delete ui->graphicsView->scene();
     ui->graphicsView->setScene(scene);
+    //ui->graphicsView->translate(0, ui->leftTable->getTableTopPos());
+    ui->graphicsView->update();
+
+    ui->leftTable->setOtherTableData(ui->rightTable->getDirPath(), ui->rightTable->getMd5Set());
+    ui->rightTable->setOtherTableData(ui->leftTable->getDirPath(), ui->leftTable->getMd5Set());
+
+}
+
+void MainWindow::showPreferences()
+{
+    QSettings settings;
+    int chunkSize = settings.value("chunksize").toInt();
+    int chunkStep = settings.value("chunkstep").toInt();
+    PreferencesDialog prefDialog(chunkSize, chunkStep, this);
+    if (prefDialog.exec() != QDialog::Accepted)
+    {
+        return;
+    }
+
+    settings.setValue("chunksize", prefDialog.getChunkSize());
+    settings.setValue("chunkstep", prefDialog.getChunkStep());
+    updatePreferences();
+}
+
+void MainWindow::updatePreferences()
+{
+    QSettings settings;
+    int chunkSize = settings.value("chunksize").toInt();
+    int chunkStep = settings.value("chunkstep").toInt();
+    ui->leftTable->setPreferences(chunkSize, chunkStep);
+    ui->rightTable->setPreferences(chunkSize, chunkStep);
 }

@@ -8,10 +8,11 @@ class Md5Processor : public QObject
 public:
     Md5Processor();
 
+    void setPreferences(int chunkSize, int chunkStep);
+
 public slots:
     void computeMd5(
-            const QStringList& fileInfoList,
-            int accuracyPercent = 10);
+            const QStringList& fileInfoList);
 
 signals:
     void md5Computed(
@@ -24,5 +25,6 @@ private slots:
 private:
     bool m_shouldBreak{false};
     QStringList m_fileInfoList;
-    int m_accuracyPercent;
+    int m_chunkSize;
+    int m_chunkStep;
 };
