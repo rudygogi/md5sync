@@ -2,6 +2,7 @@
 #include "ui_MainWindow.h"
 
 #include "PreferencesDialog.h"
+#include "Settings.h"
 #include <QTimer>
 #include <QSettings>
 
@@ -23,11 +24,17 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->preferencesAction, &QAction::triggered, this, [this](bool){ showPreferences(); });
     connect(ui->exitAction, &QAction::triggered, this, [](bool){ QCoreApplication::quit(); });
 
+    Settings settings;
+    ui->leftTable->setRootPath(settings.getLeftPath());
+    ui->rightTable->setRootPath(settings.getRightPath());
     updatePreferences();
 }
 
 MainWindow::~MainWindow()
 {
+    Settings settings;
+    settings.setLeftPath(ui->leftTable->getRootPath());
+    settings.setRightPath(ui->rightTable->getRootPath());
     delete ui;
 }
 
@@ -149,25 +156,25 @@ void MainWindow::updateConnections()
 
 void MainWindow::showPreferences()
 {
-    QSettings settings;
-    int chunkSize = settings.value("chunksize").toInt();
-    int chunkStep = settings.value("chunkstep").toInt();
+    Settings settings;
+    int chunkSize = settings.getChunkSize();
+    int chunkStep = settings.getChunkStep();
     PreferencesDialog prefDialog(chunkSize, chunkStep, this);
     if (prefDialog.exec() != QDialog::Accepted)
     {
         return;
     }
 
-    settings.setValue("chunksize", prefDialog.getChunkSize());
-    settings.setValue("chunkstep", prefDialog.getChunkStep());
+    settings.setChunkSize(prefDialog.getChunkSize());
+    settings.setChunkStep(prefDialog.getChunkStep());
     updatePreferences();
 }
 
 void MainWindow::updatePreferences()
 {
-    QSettings settings;
-    int chunkSize = settings.value("chunksize").toInt();
-    int chunkStep = settings.value("chunkstep").toInt();
+    Settings settings;
+    int chunkSize = settings.getChunkSize();
+    int chunkStep = settings.getChunkStep();
     ui->leftTable->setPreferences(chunkSize, chunkStep);
     ui->rightTable->setPreferences(chunkSize, chunkStep);
 }

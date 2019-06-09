@@ -136,6 +136,27 @@ Md5TableWidget::~Md5TableWidget()
     delete m_ui;
 }
 
+void Md5TableWidget::setRootPath(const QString &path)
+{
+    if (path.isEmpty())
+    {
+        return;
+    }
+    if (!QDir(path).exists())
+    {
+        return;
+    }
+    m_ui->pathLineEdit->setText(path);
+    cd();
+}
+
+QString Md5TableWidget::getRootPath() const
+{
+    auto rootIndex = m_ui->tableView->rootIndex();
+    auto pathInfo = m_model->fileInfo(rootIndex);
+    return pathInfo.absoluteFilePath();
+}
+
 void Md5TableWidget::setScrollBarPosition(Md5TableWidget::ScrollBarPosition pos)
 {
     switch(pos)
@@ -181,6 +202,8 @@ int Md5TableWidget::getTableHeight() const
 void Md5TableWidget::setPreferences(int chunkSize, int chunkStep)
 {
     m_md5Worker->setPreferences(chunkSize, chunkStep);
+    m_model->resetMd5Hash();
+    requestMd5();
 }
 
 QHash<QByteArray, QSet<int>> Md5TableWidget::getMd5PositionHash() const
@@ -317,6 +340,7 @@ void Md5TableWidget::showSelectedPreviews()
 {
     m_ui->listWidget->clear();
     auto selectedRows = m_ui->tableView->selectionModel()->selectedRows();
+    QStringList fileNameList;
     for(auto selectedIndex : selectedRows)
     {
         auto fileInfo = m_model->fileInfo(selectedIndex);
@@ -336,14 +360,27 @@ void Md5TableWidget::showSelectedPreviews()
             icon = QIcon(pixmap.scaled(QSize(128, 128), Qt::KeepAspectRatio));
         }
         auto item = new QListWidgetItem(icon, fileInfo.fileName().left(8).append("..."));
+//        auto item = new QListWidgetItem(fileInfo.fileName().left(8).append("..."));
         item->setData(Qt::UserRole, fileInfo.absoluteFilePath());
         m_ui->listWidget->addItem(item);
+        fileNameList.append(fileInfo.absoluteFilePath());
     }
 }
 
 void Md5TableWidget::selectAll()
 {
-    m_ui->tableView->selectAll();
+    selectNone();
+    selectNone();
+    QModelIndex rootIndex = m_ui->tableView->rootIndex();
+    for(int row = 0; row < m_model->rowCount(rootIndex); ++row)
+    {
+        QModelIndex index = rootIndex.child(row, 0);
+        if (m_model->fileInfo(index).isDir())
+        {
+            continue;
+        }
+        m_ui->tableView->selectionModel()->select(index, QItemSelectionModel::Select | QItemSelectionModel::Rows);
+    }
 }
 
 void Md5TableWidget::selectNone()

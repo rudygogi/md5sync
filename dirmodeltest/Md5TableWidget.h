@@ -19,6 +19,9 @@ public:
     explicit Md5TableWidget(QWidget *parent = nullptr);
     ~Md5TableWidget();
 
+    void setRootPath(const QString& path);
+    QString getRootPath() const;
+
     enum ScrollBarPosition
     {
         POSITION_LEFT,

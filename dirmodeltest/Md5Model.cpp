@@ -75,3 +75,8 @@ QByteArray Md5Model::getMd5(const QModelIndex &index) const
     QModelIndex md5Index = index.sibling(index.row(), m_md5Column);
     return m_md5Hash.value(md5Index);
 }
+
+void Md5Model::resetMd5Hash()
+{
+    m_md5Hash.clear();
+}
