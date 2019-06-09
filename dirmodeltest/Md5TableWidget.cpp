@@ -12,6 +12,7 @@
 
 #include "Md5Model.h"
 #include "Md5Processor.h"
+#include "IconProvider.h"
 
 #include <QDesktopServices>
 #include <QUrl>
@@ -48,6 +49,15 @@ Md5TableWidget::Md5TableWidget(QWidget *parent) :
             this, &Md5TableWidget::setMd5);
     m_md5Thread->start();
     requestMd5();
+
+    m_iconThread = new QThread(this);
+    m_iconWorker = new IconProvider;
+    m_iconWorker->moveToThread(m_iconThread);
+    connect(m_iconThread, &QThread::finished,
+            m_iconWorker, &QObject::deleteLater);
+    connect(m_iconWorker, &IconProvider::iconReady,
+            this, &Md5TableWidget::showIcon);
+    m_iconThread->start();
 
     connect(m_model, &QAbstractItemModel::rowsInserted,
             this, &Md5TableWidget::requestMd5);
@@ -301,6 +311,8 @@ void Md5TableWidget::cdUp()
 {
     m_ui->tableView->setRootIndex(m_ui->tableView->rootIndex().parent());    
     onDirectoryLoaded();
+    selectNone();
+    showSelectedPreviews();
 }
 
 void Md5TableWidget::cd()
@@ -313,6 +325,8 @@ void Md5TableWidget::cd()
     }
     m_ui->tableView->setRootIndex(index);
     onDirectoryLoaded();
+    selectNone();
+    showSelectedPreviews();
 }
 
 void Md5TableWidget::updatePathLine()
@@ -349,27 +363,37 @@ void Md5TableWidget::showSelectedPreviews()
             continue;
         }
 
-        QIcon icon;
-        QImageReader imageReader(fileInfo.absoluteFilePath());
-        imageReader.setAutoTransform(true);
-        QImage image = imageReader.read();
-        if (!image.isNull())
-        {
-            QPixmap pixmap;
-            pixmap.convertFromImage(image);
-            icon = QIcon(pixmap.scaled(QSize(128, 128), Qt::KeepAspectRatio));
-        }
-        auto item = new QListWidgetItem(icon, fileInfo.fileName().left(8).append("..."));
-//        auto item = new QListWidgetItem(fileInfo.fileName().left(8).append("..."));
+        auto item = new QListWidgetItem(fileInfo.fileName().left(8).append("..."));
         item->setData(Qt::UserRole, fileInfo.absoluteFilePath());
         m_ui->listWidget->addItem(item);
         fileNameList.append(fileInfo.absoluteFilePath());
+    }
+    m_iconWorker->provideIcons(fileNameList);
+}
+
+void Md5TableWidget::showIcon(const QString &fileName, const QIcon &icon)
+{
+    for(int row = 0; row < m_ui->listWidget->count(); ++row)
+    {
+        auto* item = m_ui->listWidget->item(row);
+        if (!item)
+        {
+            continue;
+        }
+        QString itemFileName = item->data(Qt::UserRole).toString();
+        if (itemFileName != fileName)
+        {
+            continue;
+        }
+        auto newItem = new QListWidgetItem(icon, item->text());
+        newItem->setData(Qt::UserRole, item->data(Qt::UserRole));
+        delete m_ui->listWidget->takeItem(row);
+        m_ui->listWidget->insertItem(row, newItem);
     }
 }
 
 void Md5TableWidget::selectAll()
 {
-    selectNone();
     selectNone();
     QModelIndex rootIndex = m_ui->tableView->rootIndex();
     for(int row = 0; row < m_model->rowCount(rootIndex); ++row)

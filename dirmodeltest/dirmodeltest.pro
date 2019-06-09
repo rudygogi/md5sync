@@ -20,7 +20,8 @@ SOURCES += main.cpp\
     Md5TableWidget.cpp \
     MainWindow.cpp \
     PreferencesDialog.cpp \
-    Settings.cpp
+    Settings.cpp \
+    IconProvider.cpp
 
 HEADERS  += \
     Md5Model.h \
@@ -28,7 +29,8 @@ HEADERS  += \
     Md5TableWidget.h \
     MainWindow.h \
     PreferencesDialog.h \
-    Settings.h
+    Settings.h \
+    IconProvider.h
 
 FORMS    += \
     Md5TableWidget.ui \

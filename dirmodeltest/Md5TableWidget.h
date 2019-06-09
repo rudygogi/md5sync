@@ -2,6 +2,7 @@
 
 class Md5Model;
 class Md5Processor;
+class IconProvider;
 
 #include <QWidget>
 #include <QScrollBar>
@@ -59,6 +60,7 @@ private:
     void resizeSections();
 
     void showSelectedPreviews();
+    void showIcon(const QString& fileName, const QIcon& icon);
 
     void selectAll();
     void selectNone();
@@ -73,8 +75,13 @@ private:
 private:
     Ui::Md5TableWidget *m_ui;
     Md5Model* m_model { nullptr };
+
     QThread* m_md5Thread { nullptr };
     Md5Processor* m_md5Worker { nullptr };
+
+    QThread* m_iconThread{nullptr};
+    IconProvider* m_iconWorker{nullptr};
+
     QScrollBar* m_scrollBar;
 
     QString m_otherDirPath;
