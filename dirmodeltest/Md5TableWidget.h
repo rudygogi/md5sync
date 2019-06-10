@@ -47,6 +47,9 @@ public:
 signals:
     void dataChanged();
 
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override;
+
 private:
     void onDoubleClicked(const QModelIndex &index);
     void setMd5(const QString& fileInfo, const QByteArray& md5);

@@ -9,6 +9,7 @@
 #include <QThread>
 #include <QTimer>
 #include <QUrl>
+#include <QKeyEvent>
 
 #include "Md5Model.h"
 #include "Md5Processor.h"
@@ -135,6 +136,8 @@ Md5TableWidget::Md5TableWidget(QWidget *parent) :
             this, [this]() { copyFiles(); });
     connect(m_ui->moveButton, &QPushButton::clicked,
             this, [this]() { moveFiles(); });
+
+    m_ui->tableView->installEventFilter(this);
 }
 
 Md5TableWidget::~Md5TableWidget()
@@ -279,6 +282,23 @@ QSet<QByteArray> Md5TableWidget::getMd5Set() const
     return md5Set;
 }
 
+bool Md5TableWidget::eventFilter(QObject *watched, QEvent *event)
+{
+    if (watched == m_ui->tableView && event->type() == QEvent::KeyPress)
+    {
+        auto keyEvent = dynamic_cast<QKeyEvent*>(event);
+        if (keyEvent->key() == Qt::Key_Backspace)
+        {
+            cdUp();
+        }
+        else if (keyEvent->key() == Qt::Key_Return)
+        {
+            onDoubleClicked(m_ui->tableView->currentIndex());
+        }
+    }
+    return QWidget::eventFilter(watched, event);
+}
+
 void Md5TableWidget::onDoubleClicked(const QModelIndex &index)
 {
     QFileInfo fileInfo = m_model->fileInfo(index);
@@ -309,10 +329,15 @@ void Md5TableWidget::requestMd5()
 
 void Md5TableWidget::cdUp()
 {
-    m_ui->tableView->setRootIndex(m_ui->tableView->rootIndex().parent());    
+    auto parentIndex = m_ui->tableView->rootIndex().parent();
+    m_ui->tableView->setRootIndex(parentIndex);
+    m_ui->tableView->selectionModel()->select(
+                parentIndex,
+                QItemSelectionModel::Select | QItemSelectionModel::Rows | QItemSelectionModel::Current);
     onDirectoryLoaded();
-    selectNone();
     showSelectedPreviews();
+    m_ui->tableView->scrollTo(m_ui->tableView->currentIndex(), QAbstractItemView::PositionAtCenter);
+    m_ui->tableView->setFocus();
 }
 
 void Md5TableWidget::cd()
