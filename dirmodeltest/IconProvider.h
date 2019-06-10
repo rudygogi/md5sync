@@ -17,9 +17,19 @@ signals:
     void iconReady(const QString& fileName, const QIcon& icon);
 
 private:
-    void readIcons();
+    void readIcons(const QStringList& fileNameList);
 private:
-    QStringList m_fileNameList;
+    bool m_shouldBreak{false};
+};
+
+#include <QFileIconProvider>
+
+class DummyFileIconProvider : public QFileIconProvider
+{
+public:
+    DummyFileIconProvider();
+
+    QIcon icon(const QFileInfo &info) const override;
 };
 
 #endif // ICONPROVIDER_H

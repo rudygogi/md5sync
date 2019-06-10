@@ -28,6 +28,7 @@ Md5TableWidget::Md5TableWidget(QWidget *parent) :
                 m_ui->tableView->fontMetrics().height());
 
     m_model = new Md5Model(this);
+    m_model->setIconProvider(new DummyFileIconProvider);
     auto pictLocationList = QStandardPaths::standardLocations(QStandardPaths::PicturesLocation);
     if (!pictLocationList.isEmpty())
     {
@@ -145,6 +146,8 @@ Md5TableWidget::~Md5TableWidget()
     m_md5Worker->computeMd5({});
     m_md5Thread->quit();
     m_md5Thread->wait(3000);
+    m_iconThread->quit();
+    m_iconThread->wait(3000);
     delete m_md5Thread;
     delete m_ui;
 }

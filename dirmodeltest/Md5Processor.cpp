@@ -15,22 +15,33 @@ void Md5Processor::setPreferences(int chunkSize, int chunkStep)
 {
     m_chunkSize = chunkSize;
     m_chunkStep = chunkStep;
-    QTimer::singleShot(0, this, [this](){ computeMd5();});
+    m_shouldBreak = true;
+    QTimer::singleShot(0, this, [this](){ computeMd5Priv();});
 }
 
 void Md5Processor::computeMd5(const QStringList &fileInfoList)
 {
-    m_shouldBreak = true;
-    m_fileInfoList = fileInfoList;
-    QTimer::singleShot(0, this, [this](){ computeMd5();});
+    m_shouldBreak = true;    
+    QTimer::singleShot(0, this, [=](){ computeMd5Priv(fileInfoList);});
 }
 
-void Md5Processor::computeMd5()
+void Md5Processor::computeMd5Priv(const QStringList& fileInfoList)
+{
+    m_fileInfoList = fileInfoList;
+    computeMd5Priv();
+}
+void Md5Processor::computeMd5Priv()
 {
     m_shouldBreak = false;
-
+    qInfo() << "Computing MD5 started";
     for(QString fileInfo : m_fileInfoList)
     {
+        if (m_shouldBreak)
+        {
+            qWarning() << "break";
+            return;
+        }
+
         qInfo() << fileInfo;
         QFile file(fileInfo);
         if (!file.open(QIODevice::ReadOnly))
@@ -54,14 +65,10 @@ void Md5Processor::computeMd5()
                     break;
                 }
                 file.seek(pos + m_chunkStep);
-                if (m_shouldBreak)
-                {
-                    qWarning() << "break";
-                    return;
-                }
             }
         }
         emit md5Computed(fileInfo, md5Hash.result());
     }
+    qInfo() << "Computing MD5 finished";
 }
 

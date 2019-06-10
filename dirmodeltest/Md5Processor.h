@@ -20,7 +20,8 @@ signals:
             const QByteArray& md5);
 
 private slots:
-    void computeMd5();
+    void computeMd5Priv(const QStringList& fileInfoList);
+    void computeMd5Priv();
 
 private:
     bool m_shouldBreak{false};

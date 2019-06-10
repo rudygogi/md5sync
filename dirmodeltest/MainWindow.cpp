@@ -151,7 +151,6 @@ void MainWindow::updateConnections()
 
     ui->leftTable->setOtherTableData(ui->rightTable->getDirPath(), ui->rightTable->getMd5Set());
     ui->rightTable->setOtherTableData(ui->leftTable->getDirPath(), ui->leftTable->getMd5Set());
-
 }
 
 void MainWindow::showPreferences()

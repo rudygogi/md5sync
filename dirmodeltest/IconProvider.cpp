@@ -12,17 +12,22 @@ IconProvider::IconProvider(QObject *parent) :
 
 void IconProvider::provideIcons(const QStringList &fileNameList)
 {
-    m_fileNameList = fileNameList;
-    QTimer::singleShot(0, this, [this]() { readIcons(); });
+    m_shouldBreak = true;
+    QTimer::singleShot(0, this, [=]() { readIcons(fileNameList); });
 }
 
-void IconProvider::readIcons()
+void IconProvider::readIcons(const QStringList& fileNameList)
 {
+    m_shouldBreak = false;
     QFileIconProvider iconProv;
-    while(!m_fileNameList.isEmpty())
+    for(auto fileName : fileNameList)
     {
+        if (m_shouldBreak)
+        {
+            return;
+        }
+
         QIcon icon;
-        QString fileName = m_fileNameList.takeFirst();
         QImageReader imageReader(fileName);
         imageReader.setAutoTransform(true);
         QImage image = imageReader.read();
@@ -37,5 +42,23 @@ void IconProvider::readIcons()
             icon = iconProv.icon(fileName);
         }
         emit iconReady(fileName, icon);
+    }
+}
+
+DummyFileIconProvider::DummyFileIconProvider() :
+    QFileIconProvider()
+{
+
+}
+
+QIcon DummyFileIconProvider::icon(const QFileInfo &info) const
+{
+    if (info.isDir())
+    {
+        return QFileIconProvider::icon(Folder);
+    }
+    else
+    {
+        return QFileIconProvider::icon(File);
     }
 }
